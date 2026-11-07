@@ -7,6 +7,8 @@ on:
   push:
     tags:
       - '*'
+    branches:
+      - release
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -29,7 +31,9 @@ jobs:
     - name: Publier la version
       uses: softprops/action-gh-release@v2
       with:
-        name: WLED ${{ github.ref_name }} (français)
+        name: WLED 16.0.1 (français)
+        tag_name: v16.0.1-fr
+        target_commitish: ${{ github.sha }}
         body: |
           WLED 16.0.1 avec l'interface traduite en français.
 
