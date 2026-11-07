@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+	<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport">
+	<meta charset="utf-8">
+	<title>Réglages DMX</title>
+	<style> html { visibility: hidden; } </style> <!-- prevent white & ugly display while loading, unhidden in loadResources() -->
+	<script>
+	// load common.js with retry on error
+	(function loadFiles() {
+		const l = document.createElement('script');
+		l.src = 'common.js';
+		l.onload = () => loadResources(['style.css'], S); // load style.css then call S()
+		l.onerror = () => setTimeout(loadFiles, 100);
+		document.head.appendChild(l);
+	})();
+	function HW(){window.open("https://kno.wled.ge/interfaces/dmx-output/");}
+	function GCH(num) {
+		gId('dmxchannels').innerHTML += "";
+		for (i=0;i<num;i++) {
+			gId('dmxchannels').innerHTML += "<span id=CH" + (i+1) + "s >Canal " + (i+1) + " : <select name=CH" + (i+1) + " id=\"CH" + (i+1) + "\"><option value=0>Fixé à 0</option><option value=1>Rouge</option><option value=2>Vert</option><option value=3>Bleu</option><option value=4>Blanc</option><option value=5>Obturateur (luminosité)</option><option value=6>Fixé à 255</option></select></span><br />\n";
+		}
+	}
+	function mMap(){
+		numCh=document.Sf.CN.value;
+		numGap=document.Sf.CG.value;
+		if (parseInt(numCh)>parseInt(numGap)) {
+			gId("gapwarning").style.display="block";
+		} else {
+			gId("gapwarning").style.display="none";
+		}
+		for (i=0;i<15;i++) {
+			if (i>=numCh) {
+				gId("CH"+(i+1) + "s").style.opacity = "0.5";
+				gId("CH"+(i+1)).disabled = true;
+				
+			} else {
+				gId("CH"+(i+1) + "s").style.opacity = "1";
+				gId("CH"+(i+1)).disabled = false;
+			}
+		}
+	}
+	function S(){
+		getLoc();
+		loadJS(getURL('/settings/s.js?p=7'), false, ()=>{GCH(15);}, ()=>{mMap();}); // If we set async false, file is loaded and executed, then next statement is processed
+		if (loc) d.Sf.action = getURL('/settings/dmx');
+	}
+	</script>
+</head>
+<body>
+<form id="form_s" name="Sf" method="post">
+<div class="toprow">
+<div class="helpB"><button type="button" onclick="HW()">?</button></div>
+<button type="button" onclick="B()">Retour</button><button type="submit">Enregistrer</button><hr>
+</div>
+<h2>Sortie DMX</h2><!-- TODO: Change to something less-meme-related //-->
+
+Univers relayé <input name=PU type=number min=0 max=63999 required> de l'E1.31 vers le DMX (0 = désactivé)<br>
+<i>Cela désactive la sortie des données LED vers le DMX configurable ci-dessous</i><br><br>
+<i>Le nombre d'appareils est repris de la page de configuration des LED</i><br>
+
+Canaux par appareil (15 max.) : <input type="number" min="1" max="15" name="CN" maxlength="2" onchange="mMap();"><br />
+Canal de départ : <input type="number" min="1" max="512" name="CS" maxlength="2"><br />
+Écart entre les canaux de départ : <input type="number" min="1" max="512" name="CG" maxlength="2" onchange="mMap();"> [ <a href="javascript:alert('Avec 10, le premier appareil commence à 10,\nle deuxième à 20, etc.,\nquel que soit le nombre de canaux.\nLes numéros de canaux sont ainsi plus faciles à retenir.');">info</a> ]<br>
+<div id="gapwarning" style="color: orange; display: none;">ATTENTION : l'écart entre canaux est inférieur au nombre de canaux par appareil.<br />Ils vont se chevaucher.</div>
+<button type="button" onclick="location.href='/dmxmap';">Carte DMX</button><br>
+LED de départ des appareils DMX : <input type="number" min="0" max="1500" name="SL">
+<h3>Fonctions des canaux</h3>
+<div id="dmxchannels"></div>
+<hr><button type="button" onclick="B()">Retour</button><button type="submit">Enregistrer</button>
+</form>
+</body>
+</html>

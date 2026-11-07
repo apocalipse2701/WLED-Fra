@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+	<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport">
+	<meta charset="utf-8">
+	<title>Réglages de l'heure</title>
+	<style> html { visibility: hidden; } </style> <!-- prevent white & ugly display while loading, unhidden in loadResources() -->
+	<script>
+	var el=false;
+	var ms=["Janv.","Févr.","Mars","Avr.","Mai","Juin","Juil.","Août","Sept.","Oct.","Nov.","Déc."];
+	var timerCount = 0;
+	var maxTimers;
+	var presets = {};
+	var sortedPresetOptions = '';
+	const TIMER_SUNRISE = 255;
+	const TIMER_SUNSET = 254;
+	const TIMER_WEEKDAYS_ALL = 255;
+	// load common.js with retry on error
+	(function loadFiles() {
+		const l = document.createElement('script');
+		l.src = 'common.js';
+		l.onload = () => loadResources(['style.css'], S); // load style.css then call S()
+		l.onerror = () => setTimeout(loadFiles, 100);
+		document.head.appendChild(l);
+	})();
+
+	function S() {
+		getLoc();
+		populatePresets(true);
+		loadJS(getURL('/settings/s.js?p=5'), false, ()=>{BTa();}, ()=>{
+			updLatLon();
+			Cs();
+		});
+		if (loc) d.Sf.action = getURL('/settings/time');
+	}
+	function populatePresets(fromls) {
+		let json = null;
+		if (fromls) {
+			try {
+				json = JSON.parse(localStorage.getItem("wledP"));
+			} catch (e) {}
+		}
+
+		if (!json) {
+			showToast("Ouvrez d'abord l'interface principale pour charger les préréglages", true);
+			return;
+		}
+
+		onPresetsLoaded(json);
+	}
+	function onPresetsLoaded(json) {
+		presets = json;
+		delete presets["0"];
+		bSPO();
+		pMP();
+		rTOPO();
+		rBPO();
+	}
+	function bSPO() { // buildSortedPresetOptions
+		sortedPresetOptions = '';
+		for (var p of Object.entries(presets)) {
+			var id = p[0];
+			var name = p[1].n || ("Préréglage " + id);
+			sortedPresetOptions += `<option value="${id}">${id}: ${name}</option>`;
+		}
+	}
+	function sPSV(sel, value, attrName) { // setPresetSelectValue
+		var v = (value === undefined || value === null || value === "") ? "0" : String(value);
+		sel.setAttribute(attrName, v);
+		sel.value = v;
+		if (sel.value === "") sel.value = "0";
+	}
+	function rPS(sel, presetOpts, attrName) { // refreshPresetSelect
+		var currentVal = sel.value;
+		var initialVal = sel.getAttribute(attrName);
+		var val = currentVal;
+		if ((val === "" || val === "0") && initialVal !== null && initialVal !== "" && initialVal !== "0") {
+			val = initialVal;
+		}
+		if (val === "") val = "0";
+		sel.innerHTML = presetOpts;
+		sel.value = val;
+		if (sel.value === "" && initialVal !== null && initialVal !== "") sel.value = initialVal;
+		if (sel.value === "") sel.value = "0";
+	}
+	function expand(o,i)
+	{
+		var t = gId("WD"+i);
+		t.style.display = t.style.display!=="none" ? "none" : "";
+		o.innerHTML = t.style.display==="none" ? "&#128197;" : "&#x2715;";
+	}
+	function Cs() { gId("cac").style.display=(gN("OL").checked)?"block":"none"; }
+	function BTa()
+	{
+		timerCount = 0;
+		gId("TMT").innerHTML = "<thead><tr><th>Act.</th><th>Type</th><th>Heure</th><th>Minute</th><th></th></tr></thead>";
+	}
+	function addTimerRow(hour, minute, preset, weekdays, monthStart, dayStart, monthEnd, dayEnd) {
+		if (timerCount >= maxTimers) return;
+		var i = timerCount++;
+		var isSunrise = (hour === TIMER_SUNRISE);
+		var isSunset = (hour === TIMER_SUNSET);
+		var isSpecial = isSunrise || isSunset;
+		if (hour === undefined) hour = 0;
+		if (minute === undefined) minute = 0;
+		if (preset === undefined) preset = 0;
+		if (weekdays === undefined) weekdays = TIMER_WEEKDAYS_ALL;
+		if (monthStart === undefined) monthStart = 1;
+		if (dayStart === undefined) dayStart = 1;
+		if (monthEnd === undefined) monthEnd = 12;
+		if (dayEnd === undefined) dayEnd = 31;
+		var enabled = weekdays & 1;
+		var dow = weekdays >> 1;
+		var container = gId("TMT");
+		var hourVal = isSpecial ? 0 : hour;
+		var presetOpts = '<option value="0">Supprimer le minuteur</option>' + sortedPresetOptions;
+
+		var weekdayTable = '<table class="tw"><tr><th>L</th><th>M</th><th>M</th><th>J</th><th>V</th><th>S</th><th>D</th></tr><tr>';
+		for (j=1;j<8;j++) weekdayTable += `<td><input id="W${i}${j}" type="checkbox" ${(dow>>(j-1))&1?'checked':''}></td>`;
+		weekdayTable += '</tr></table>';
+
+		var dateRange = `<div id="DR${i}" class="tdr"><span class="tdf">du <select name="M${i}">`;
+		for (j=0;j<12;j++) dateRange += `<option value="${j+1}" ${monthStart==j+1?'selected':''}>${ms[j]}</option>`;
+		dateRange += `</select><input name="D${i}" class="xs" type="number" min="1" max="31" value="${dayStart}"></span><span class="tdf">au <select name="P${i}">`;
+		for (j=0;j<12;j++) dateRange += `<option value="${j+1}" ${monthEnd==j+1?'selected':''}>${ms[j]}</option>`;
+		dateRange += `</select><input name="E${i}" class="xs" type="number" min="1" max="31" value="${dayEnd}"></span></div>`;
+
+		var timerMain = `
+			<tr>
+				<td>
+					<input name="W${i}" id="W${i}" type="hidden">
+					<input id="W${i}0" type="checkbox" ${enabled ? "checked" : ""}>
+				</td><td>
+					<select id="TS${i}" class="s" onchange="TT(${i})">
+						<option value="0" ${!isSpecial ? "selected" : ""}>Normal</option>
+						<option value="${TIMER_SUNRISE}" ${isSunrise ? "selected" : ""}>Lever du soleil</option>
+						<option value="${TIMER_SUNSET}" ${isSunset ? "selected" : ""}>Coucher du soleil</option>
+					</select><br>
+				</td><td>
+					<input ${isSpecial ? "" : 'name="H'+i+'"'} id="H${i}" class="s" type="number" min="0" max="24" value="${hourVal}" ${isSpecial ? "disabled" : ""}>
+				</td>
+				<td><input name="N${i}" id="N${i}" class="l" type="number" min="${isSpecial ? -120 : 0}" max="${isSpecial ? 120 : 59}" value="${minute}"></td>
+				<td><div id="CB${i}" onclick="expand(this,${i})" class="cal">&#128197;</div></td>
+			</tr><tr>
+				<td colspan="5">
+					<select name="T${i}" id="T${i}" class="s">${presetOpts}</select>
+				</td>
+			</tr><tr><td colspan="5"><hr></td></tr>
+		`;
+
+		var timerExpanded = `
+			<tr>
+				<td colspan="5">
+					<div id="WD${i}" style="display:none;background-color:#444;">
+						<hr>Jours d'exécution
+						${weekdayTable}
+						${dateRange}
+						<hr>
+					</div>
+				</td>
+			</tr>
+		`;
+
+		container.insertAdjacentHTML("beforeend", timerMain + timerExpanded);
+		var timerPresetSel = gId("T"+i);
+		sPSV(timerPresetSel, preset, "data-preset");
+	}
+	function TT(i) {
+		var sel = gId("TS"+i);
+		var hour = gId("H"+i);
+		var min = gId("N"+i);
+		var isSpecial = sel.value != 0;
+		hour.disabled = isSpecial;
+		if (isSpecial) {
+			// Save current hour value before switching to sunrise/sunset
+			hour.setAttribute("data-regular-hour", hour.value);
+			hour.removeAttribute("name");
+			min.min = -120;
+			min.max = 120;
+		} else {
+			// Restore saved hour value when switching back to regular
+			var savedHour = hour.getAttribute("data-regular-hour");
+			if (savedHour !== null && savedHour !== "") {
+				hour.value = savedHour;
+			}
+			hour.setAttribute("name", "H"+i);
+			min.min = 0;
+			min.max = 59;
+			if (min.value < 0 || min.value > 59) min.value = 0;
+		}
+	}
+	function pMP() { // populateMacroPresets
+		var presetOpts = '<option value="0">Action par défaut (0)</option>' + sortedPresetOptions;
+		var fields = ['A0','A1','MC','MN'];
+		for (var f of fields) {
+			var inp = gN(f);
+			if (!inp) continue;
+			var val = inp.getAttribute("data-preset-value");
+			if (val === null || val === "") val = inp.value;
+			if (inp.tagName === "SELECT") {
+				sPSV(inp, val, "data-preset-value");
+				rPS(inp, presetOpts, "data-preset-value");
+			} else {
+				var sel = document.createElement('select');
+				sel.name = f;
+				sel.className = inp.className;
+				sel.required = inp.required;
+				sPSV(sel, val, "data-preset-value");
+				rPS(sel, presetOpts, "data-preset-value");
+				inp.parentNode.replaceChild(sel, inp);
+			}
+		}
+	}
+	function rTOPO() { // refreshTimerPresetOptions
+		var presetOpts = '<option value="0">Supprimer le minuteur</option>' + sortedPresetOptions;
+		for (var i=0; i<timerCount; i++) {
+			var sel = gId("T"+i);
+			if (!sel) continue;
+			rPS(sel, presetOpts, "data-preset");
+		}
+	}
+	function bAO() { // buildAnalogOptions: analog functions + per-segment opacity (segment 0 included; MD=0 => segment 0)
+		var o = '<optgroup label="Fonctions analogiques"><option value="250">Luminosité globale (250)</option><option value="249">Vitesse de l\'effet (249)</option><option value="248">Intensité de l\'effet (248)</option><option value="247">Palette (247)</option><option value="200">Teinte de la couleur principale (200)</option></optgroup><optgroup label="Opacité analogique des segments">';
+		for (var j=0; j<=32; j++) o += `<option value="${j}">Opacité du segment ${j}</option>`;
+		o += '</optgroup>';
+		return o;
+	}
+	function isAnalogBtn(t) { return t==7 || t==8; } // BTN_TYPE_ANALOG / BTN_TYPE_ANALOG_INVERTED
+	function isSwitchBtn(t) { return t==4 || t==5 || t==9; } // BTN_TYPE_SWITCH / BTN_TYPE_PIR_SENSOR / BTN_TYPE_TOUCH_SWITCH
+	function btnTypeName(t) { // mirrors the button type dropdown on the LED settings page
+		switch (+t) {
+			case 2: return 'Bouton poussoir';
+			case 3: return 'Poussoir inversé';
+			case 4: return 'Interrupteur';
+			case 5: return 'Détecteur PIR';
+			case 6: return 'Tactile';
+			case 7: return 'Analogique';
+			case 8: return 'Analogique inversé';
+			case 9: return 'Tactile (interrupteur)';
+			default: return 'Désactivé';
+		}
+	}
+	function rBPO() { // refreshButtonPresetOptions
+		var presetOpts = '<option value="0">Action par défaut (0)</option>' + sortedPresetOptions;
+		var analogOpts = bAO();
+		var container = gId("macros");
+		if (!container) return;
+		// analog buttons only have an MD select (MP/ML are hidden 0 inputs); MD uses analog options, never presets
+		var sels = container.querySelectorAll('select[name^="MP"],select[name^="ML"],select[name^="MD"]');
+		for (var sel of sels) {
+			var bb = sel.closest ? sel.closest(".bb") : null;
+			var t = bb ? parseInt(bb.getAttribute("data-btype")||"0",10) : 0;
+			rPS(sel, isAnalogBtn(t) ? analogOpts : presetOpts, "data-preset");
+		}
+	}
+	function Wd()
+	{
+		for (i=0; i<timerCount; i++) {
+			var m=1, val=0;
+			for(j=0;j<8;j++) { val+=gId(("W"+i)+j).checked*m; m*=2;}
+			gId("W"+i).value=val;
+			var sel = gId("TS"+i);
+			var hour = gId("H"+i);
+			if (sel && sel.value != 0) {
+				// Re-add name attribute, remove disabled, and set value for sunrise/sunset before submission
+				hour.setAttribute("name", "H"+i);
+				hour.disabled = false;
+				hour.value = sel.value;
+			}
+		}
+		if (d.Sf.LTR.value==="S") { d.Sf.LT.value = -1*parseFloat(d.Sf.LT.value); }
+		if (d.Sf.LNR.value==="W") { d.Sf.LN.value = -1*parseFloat(d.Sf.LN.value); }
+	}
+	function addRow(i,p,l,d,t) {
+		if (t===undefined) t = 0;
+		var b = String.fromCharCode((i<10?48:55)+i);
+		var presetOpts = '<option value="0">Action par défaut (0)</option>' + sortedPresetOptions;
+		var typeName = btnTypeName(t);
+		var buttonBlock = document.createElement('div');
+		buttonBlock.className = 'bb';
+		buttonBlock.setAttribute('data-btype', t); // read back by rBPO() to rebuild selects correctly
+		if (isAnalogBtn(t)) {
+			// analog buttons: MD holds the function/segment; short/long press are unused (firmware defaults missing MP/ML to 0)
+			buttonBlock.innerHTML = `
+				<div class="bh">Analogique ${i} - ${typeName}</div>
+				<div class="bs">
+					<div class="ba">
+						<label>Fonction analogique</label>
+						<select name="MD${b}" class="s" required>${bAO()}</select>
+					</div>
+				</div>
+				<hr style="width:100%;margin:8px 0 0 0;">
+			`;
+			sPSV(buttonBlock.querySelector('select[name="MD'+b+'"]'), String(d), "data-preset");
+		} else if (isSwitchBtn(t)) {
+			// switches: MP fires on On->Off, ML on Off->On; double press (MD) is unused (firmware defaults missing MD to 0)
+			buttonBlock.innerHTML = `
+				<div class="bh">Interrupteur ${i} - ${typeName}</div>
+				<div class="bs">
+					<div class="ba">
+						<label>Marche → Arrêt</label>
+						<select name="MP${b}" class="s" required>${presetOpts}</select>
+					</div>
+					<div class="ba">
+						<label>Arrêt → Marche</label>
+						<select name="ML${b}" class="s" required>${presetOpts}</select>
+					</div>
+				</div>
+				<hr style="width:100%;margin:8px 0 0 0;">
+			`;
+			var switchSels = buttonBlock.querySelectorAll("select");
+			var switchVals = [String(p), String(l)];
+			for (var si=0; si<switchSels.length; si++) {
+				sPSV(switchSels[si], switchVals[si], "data-preset");
+			}
+		} else {
+			// pushbuttons: short (MP), long (ML) and double (MD) press
+			buttonBlock.innerHTML = `
+				<div class="bh">Bouton ${i} - ${typeName}</div>
+				<div class="bs">
+					<div class="ba">
+						<label>Appui court</label>
+						<select name="MP${b}" class="s" required>${presetOpts}</select>
+					</div>
+					<div class="ba">
+						<label>Appui long</label>
+						<select name="ML${b}" class="s" required>${presetOpts}</select>
+					</div>
+					<div class="ba">
+						<label>Double appui</label>
+						<select name="MD${b}" class="s" required>${presetOpts}</select>
+					</div>
+				</div>
+				<hr style="width:100%;margin:8px 0 0 0;">
+			`;
+			var buttonSels = buttonBlock.querySelectorAll("select");
+			var buttonVals = [String(p), String(l), String(d)];
+			for (var si=0; si<buttonSels.length; si++) {
+				sPSV(buttonSels[si], buttonVals[si], "data-preset");
+			}
+		}
+		gId("macros").appendChild(buttonBlock);
+	}
+	function getLatLon() {
+		if (!el) {
+			window.addEventListener("message", (event) => {
+				if (event.origin !== "https://locate.wled.me") return;
+				if (event.data instanceof Object) {
+					d.Sf.LT.value = event.data.lat;
+					d.Sf.LN.value = event.data.lon;
+					updLatLon();
+				}
+			}, false);
+			el = true;
+		}
+		window.open("https://locate.wled.me","_blank");
+	}
+	function updLatLon(i) {
+		if (parseFloat(d.Sf.LT.value)<0) { d.Sf.LTR.value = "S"; d.Sf.LT.value = -1*parseFloat(d.Sf.LT.value); } else d.Sf.LTR.value = "N";
+		if (parseFloat(d.Sf.LN.value)<0) { d.Sf.LNR.value = "W"; d.Sf.LN.value = -1*parseFloat(d.Sf.LN.value); } else d.Sf.LNR.value = "E";
+	}
+	</script>
+</head>
+<body>
+<form id="form_s" name="Sf" method="post" onsubmit="Wd()">
+	<div class="toprow">
+	<div class="helpB"><button type="button" onclick="H('features/settings/#time-settings')">?</button></div>
+	<button type="button" onclick="B()">Retour</button><button type="submit">Enregistrer</button><hr>
+	</div>
+	<h2>Réglage de l'heure</h2>
+	<div class="sec">
+		Obtenir l'heure d'un serveur NTP : <input type="checkbox" name="NT"><br>
+		<input type="text" name="NS" maxlength="32"><br>
+		Format 24 h : <input type="checkbox" name="CF"><br>
+		Fuseau horaire : 
+		<select name="TZ">
+			<option value="0" selected>GMT(UTC)</option>
+			<option value="1">GMT/BST</option>
+			<option value="2">CET/CEST</option>
+			<option value="3">EET/EEST</option>
+			<option value="4">US-EST/EDT</option>
+			<option value="5">US-CST/CDT</option>
+			<option value="6">US-MST/MDT</option>
+			<option value="7">US-AZ</option>
+			<option value="8">US-PST/PDT</option>
+			<option value="9">CST (AWST, PHST)</option>
+			<option value="10">JST (KST)</option>
+			<option value="11">AEST/AEDT</option>
+			<option value="12">NZST/NZDT</option>
+			<option value="13">Corée du Nord</option>
+			<option value="14">IST (Inde)</option>
+			<option value="15">CA-Saskatchewan</option>
+			<option value="16">ACST</option>
+			<option value="17">ACST/ACDT</option>
+			<option value="18">HST (Hawaii)</option>
+			<option value="19">NOVT (Novosibirsk)</option>
+			<option value="20">AKST/AKDT (Anchorage)</option>
+			<option value="21">MX-CST</option>
+			<option value="22">PKT (Pakistan)</option>
+			<option value="23">BRT (Brasília)</option>
+			<option value="24">AWST (Perth)</option>
+		</select><br>
+		Décalage UTC : <input name="UO" type="number" min="-65500" max="65500" required> secondes (max. 18 heures)<br>
+		Heure locale actuelle : <span class="times">inconnue</span>.<br>
+		Latitude : <select name="LTR"><option value="N">N</option><option value="S">S</option></select><input name="LT" type="number" class="xl" min="0" max="66.6" step="0.01"><br>
+		Longitude : <select name="LNR"><option value="E">E</option><option value="W">O</option></select><input name="LN" type="number" class="xl" min="0" max="180" step="0.01"><br>
+		<button type="button" id="locbtn" onclick="getLatLon()">Obtenir la position</button>
+		<div><i>(ouvre un nouvel onglet, fonctionne uniquement dans un navigateur)</i></div>
+		<div id="sun" class="times"></div>
+	</div>
+	<div class="sec">
+		<h3>Horloge</h3>
+		Superposition d'horloge analogique : <input type="checkbox" name="OL" onchange="Cs()"><br>
+		<div id="cac">
+			Première LED : <input name="O1" type="number" min="0" max="1024" required> Dernière LED : <input name="O2" type="number" min="0" max="1024" required><br>
+			LED de 12 h : <input name="OM" type="number" min="0" max="1024" required><br>
+			Afficher les repères de 5 min : <input type="checkbox" name="O5"><br>
+			Secondes (en traînée) : <input type="checkbox" name="OS"><br>
+			Afficher l'horloge seulement si toutes les LED sont éteintes : <input type="checkbox" name="OB"><br>
+		</div>
+		Mode compte à rebours : <input type="checkbox" name="CE"><br>
+		Échéance du compte à rebours :<br>
+		Date :&nbsp;<nowrap>20<input name="CY" class="xs" type="number" min="0" max="99" required>-<input name="CI" class="xs" type="number" min="1" max="12" required>-<input name="CD" class="xs" type="number" min="1" max="31" required></nowrap><br>
+		Heure :&nbsp;<nowrap><input name="CH" class="xs" type="number" min="0" max="23" required>:<input name="CM" class="xs" type="number" min="0" max="59" required>:<input name="CS" class="xs" type="number" min="0" max="59" required></nowrap><br>
+	</div>
+	<hr>
+	<h2>Préréglages macros</h2>
+	<i>Les préréglages peuvent servir de macros pour les commandes API JSON et HTTP.<br>
+	Saisissez l'ID du préréglage ci-dessous.</i>
+	<i>Utilisez 0 pour l'action par défaut au lieu d'un préréglage</i><br>
+	<a href="https://kno.wled.ge/interfaces/json-api/" target="_blank">JSON API</a><br>
+	<a href="https://kno.wled.ge/interfaces/http-api/" target="_blank">HTTP API</a><br>
+	<div class="sec">
+		<h3>Préréglages de minuterie et Alexa</h3>
+		Préréglage de fin du compte à rebours : <input name="MC" class="m" type="number" min="0" max="250" required><br>
+		Préréglage de fin de minuterie : <input name="MN" class="m" type="number" min="0" max="250" required><br>
+		Préréglage Alexa marche/arrêt : <input name="A0" class="m" type="number" min="0" max="250" required> <input name="A1" class="m" type="number" min="0" max="250" required><br>
+	</div>
+	<div class="sec">
+		<h3>Préréglages des boutons</h3>
+		<div id="macros"></div>
+		<a href="https://kno.wled.ge/features/macros/#analog-button" target="_blank">Configuration des boutons analogiques</a>
+	</div>
+	<div class="sec">
+		<h3>Préréglages programmés</h3>
+		<div style="display: inline-block">
+			<table id="TMT" style="min-width:330px;"></table>
+			<button type="button" onclick="addTimerRow()">Ajouter un minuteur</button>
+		</div>
+	</div>
+	<hr>
+	<button type="button" onclick="B()">Retour</button><button type="submit">Enregistrer</button>
+</form>
+</body>
+</html>

@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+	<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport">
+	<meta charset="utf-8">
+	<title>Sécurité et mises à jour</title>
+	<style> html { visibility: hidden; } </style> <!-- prevent white & ugly display while loading, unhidden in loadResources() -->
+	<script>
+		// load common.js with retry on error
+		(function loadFiles() {
+			const l = document.createElement('script');
+			l.src = 'common.js';
+			l.onload = () => loadResources(['style.css'], S); // load style.css then call S()
+			l.onerror = () => setTimeout(loadFiles, 100);
+			document.head.appendChild(l);
+		})();
+		function U() { window.open(getURL("/update"),"_self"); }
+		function checkNum(o) {
+			const specialkeys = ["Backspace", "Tab", "Enter", "Shift", "Control", "Alt", "Pause", "CapsLock", "Escape", "Space", "PageUp", "PageDown", "End", "Home", "ArrowLeft", "ArrowUp", "ArrowRight", "ArrowDown", "Insert", "Delete"];
+			// true if key is a number or a special key
+			if(event.key.match(/[0-9]/) || specialkeys.includes(event.key)) return true;
+			event.preventDefault();
+			return false;
+		}
+		function setBckFilename(x) {
+			x.setAttribute("download","wled_" + x.getAttribute("download") + (sd=="WLED"?"":("_" +sd)));
+		}
+		function S() {
+			getLoc();
+			if (loc) {
+				gId("bckcfg").setAttribute('href',getURL(gId("bckcfg").pathname));
+				gId("bckpresets").setAttribute('href',getURL(gId("bckpresets").pathname));
+			}
+			loadJS(getURL('/settings/s.js?p=6'), false, undefined, ()=>{
+				setBckFilename(gId("bckcfg"));
+				setBckFilename(gId("bckpresets"));
+			});	// If we set async false, file is loaded and executed, then next statement is processed
+			if (loc) d.Sf.action = getURL('/settings/sec');
+		}
+	</script>
+</head>
+<body>
+<form id="form_s" name="Sf" method="post">
+	<div class="toprow">
+	<div class="helpB"><button type="button" onclick="H('features/settings/#security-settings')">?</button></div>
+	<button type="button" onclick="B()">Retour</button><button type="submit">Enregistrer</button><hr>
+	</div>
+		<h2>Sécurité et mises à jour</h2>
+	<div class="sec">
+		Code PIN des réglages : <input type="password" id="PIN" name="PIN" size="4" maxlength="4" minlength="4" onkeydown="checkNum(this)" pattern="[0-9]*" inputmode="numeric" title="Saisissez un nombre à 4 chiffres"><br>
+		<div class="warn">&#9888; Transmission non chiffrée. Choisissez votre PIN avec prudence : n'utilisez PAS celui de votre carte bancaire, porte, carte SIM, etc. !</div><br>
+		Verrouiller la mise à jour sans fil (OTA) : <input type="checkbox" name="NO"><br>
+		Phrase secrète : <input type="password" name="OP" maxlength="32"><br>
+		Pour activer l'OTA, vous devez aussi saisir le bon mot de passe, par sécurité !<br>
+		Changez le mot de passe une fois l'OTA activée.<br>
+		<b>Désactivez l'OTA quand vous ne l'utilisez pas, sinon un attaquant peut reflasher l'appareil !</b><br>
+		<i>Les réglages de cette page ne sont modifiables que si le verrou OTA est désactivé !</i><br>
+		Bloquer l'accès aux réglages WiFi si verrouillé : <input type="checkbox" name="OW"><br><br>
+		Réinitialisation d'usine : <input type="checkbox" name="RS"><br>
+		Tous les réglages et préréglages seront effacés.<br><br>
+		<div class="warn">&#9888; Transmission non chiffrée. Un attaquant sur le même réseau peut intercepter les données du formulaire !</div>
+	</div>
+	<div class="sec" id="OTA">
+		<h3>Mise à jour logicielle</h3>
+		<button type="button" onclick="U()">Mettre à jour WLED</button><br>
+		<div id="aOTA">Activer ArduinoOTA : <input type="checkbox" name="AO"></div>
+		Autoriser la mise à jour uniquement depuis le même réseau/WiFi : <input type="checkbox" name="SU"><br>
+		<i class="warn">&#9888; Si vous utilisez plusieurs VLAN (réseau IoT ou invité, par ex.), définissez un PIN ou désactivez cette option.<br>
+			Désactiver cette option rend votre appareil moins sûr.</i><br></span>
+	</div>
+	<div class="sec" id="backup">
+		<h3>Sauvegarde et restauration</h3>
+		<div class="warn">&#9888; Restaurer les préréglages ou la configuration ÉCRASERA vos préréglages ou votre configuration actuels.<br>
+		Un fichier ou une configuration incorrects peuvent nécessiter une réinitialisation d'usine ou un reflashage de votre ESP.<br>
+		Par sécurité, les mots de passe ne sont pas sauvegardés.</div>
+		<a class="btn lnk" id="bckcfg" href="/presets.json" download="presets">Sauvegarder les préréglages</a><br>
+		<div>Restaurer les préréglages<br><input type="file" name="data" accept=".json"> <button type="button" onclick="uploadFile(d.Sf.data,'/presets.json');">Envoyer</button><br></div><br>
+		<a class="btn lnk" id="bckpresets" href="/cfg.json" download="cfg">Sauvegarder la configuration</a><br>
+		<div>Restaurer la configuration<br><input type="file" name="data2" accept=".json"> <button type="button" onclick="uploadFile(d.Sf.data2,'/cfg.json');">Envoyer</button><br></div>
+	</div>
+	<div class="sec">
+		<h3>À propos</h3>
+		<a href="https://github.com/wled-dev/WLED/" target="_blank">WLED</a>&#32;version ##VERSION##<!-- Autoreplaced from package.json --><br><br>
+		<a href="https://kno.wled.ge/about/contributors/" target="_blank">Contributeurs, dépendances et remerciements</a><br>
+		Un immense merci à toutes les personnes qui m'ont aidé à créer WLED !<br><br>
+		(c) 2016-2024 Christian Schwinne <br>
+		<i>Publié sous la <a href="https://github.com/wled-dev/WLED/blob/main/LICENSE" target="_blank">licence EUPL v1.2</a></i><br><br>
+		Version installée : <span class="sip">WLED ##VERSION##</span>
+	</div>
+		<div id="toast"></div>
+		<button type="button" onclick="B()">Retour</button><button type="submit">Enregistrer</button>
+	</form>
+</body>
+</html>

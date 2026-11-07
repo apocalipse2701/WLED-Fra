@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+	<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport">
+	<meta charset="utf-8">
+	<title>Réglages de synchronisation</title>
+	<style> html { visibility: hidden; } </style> <!-- prevent white & ugly display while loading, unhidden in loadResources() -->
+	<script>
+	// load common.js with retry on error
+	(function loadFiles() {
+		const l = document.createElement('script');
+		l.src = 'common.js';
+		l.onload = () => loadResources(['style.css'], S); // load style.css then call S()
+		l.onerror = () => setTimeout(loadFiles, 100);
+		document.head.appendChild(l);
+	})();
+	function adj(){if (d.Sf.DI.value == 6454) {if (d.Sf.EU.value == 1) d.Sf.EU.value = 0;}
+					else if (d.Sf.DI.value == 5568) {if (d.Sf.DA.value == 0) d.Sf.DA.value = 1; if (d.Sf.EU.value == 0) d.Sf.EU.value = 1;} }
+	function FC()
+	{
+		for(j=0;j<8;j++)
+		{
+			gId("G"+(j+1)).checked=gId("GS").value>>j&1;
+			gId("R"+(j+1)).checked=gId("GR").value>>j&1;
+		}
+	}
+	function GC()
+	{
+		var a=0, b=0;
+
+		var m=1;
+		for(j=0;j<8;j++)
+		{
+			a+=gId("G"+(j+1)).checked*m;
+			b+=gId("R"+(j+1)).checked*m;
+			m*=2;
+		}
+		gId("GS").value=a;
+		gId("GR").value=b;
+	}
+	function SP(){var p = d.Sf.DI.value; gId("xp").style.display = (p > 0)?"none":"block"; if (p > 0) d.Sf.EP.value = p;}
+	function SetVal(){switch(parseInt(d.Sf.EP.value)){case 5568: d.Sf.DI.value = 5568; break; case 6454: d.Sf.DI.value = 6454; break; case 4048: d.Sf.DI.value = 4048; break; }; SP();FC();}
+	function S(){
+		getLoc();
+		loadJS(getURL('/settings/s.js?p=4'), false, undefined, ()=>{SetVal(); fetchPinInfo(pinDropdowns);});	// If we set async false, file is loaded and executed, then next statement is processed
+		if (loc) d.Sf.action = getURL('/settings/sync');
+	}
+	function getURL(path) {
+		return (loc ? locproto + "//" + locip : "") + path;
+	}
+	const dmxNs = ["IDMR","IDMT","IDME"];
+	let dmxOwnPins; // track dmx pins to update dropdown restrictions on pin change
+	function pinDropdowns() {
+		dmxNs.forEach((n,i) => { const s = makePinSelect(n, i?1:0); if (s) s.onchange = dmxPinUpd; }); // note on the i?1:0 -> RX pin is allowed input only but TX/EN pins must be GPIO
+		dmxOwnPins = dmxNs.map(n => parseInt(gN(n)?.value??-1));
+		dmxPinUpd();
+	}
+	function dmxPinUpd() {
+		const vs = dmxNs.map(n => parseInt(gN(n)?.value??-1));
+		dmxNs.forEach((n,i) => {
+			for (const o of gN(n)?.options??[]) {
+				const p = parseInt(o.value); if (p<0) continue;
+				// unlock old selected pin, lock newly selected one
+				o.disabled = (p!==vs[i] && !dmxOwnPins.includes(p) && !!d.pinsData?.find(pi=>pi.p===p)?.a) || vs.some((v,j)=>j!==i&&v===p);
+				if (!o.disabled) o.text = String(p); // clear owner name i.e. (DMX input)
+			}
+		});
+	}
+	function hideDMXInput(){gId("dmxInput").style.display="none";}
+	function hideNoDMXInput(){gId("dmxInputOff").style.display="none";}
+	function hideNoDMXOutput(){gId("dmxOnOffOutput").style.display="none";}
+	</script>
+</head>
+<body>
+<form id="form_s" name="Sf" method="post" onsubmit="GC()">
+<div class="toprow">
+<div class="helpB"><button type="button" onclick="H('interfaces/udp-notifier/')">?</button></div>
+<button type="button" onclick="B()">Retour</button><button type="submit">Enregistrer</button><hr>
+</div>
+<h2>Synchronisation</h2>
+<div class="sec">
+<h3>Diffusion WLED</h3>
+Port UDP : <input name="UP" type="number" min="1" max="65535" class="d5" required><br>
+2e port : <input name="U2" type="number" min="1" max="65535" class="d5" required><br>
+</div>
+<div class="sec">
+<h3>ESP-NOW</h3>
+<div id="NoESPNOW" class="hide">
+<i class="warn">Désactivé. Activez ESP-NOW dans les réglages WiFi.<br></i>
+</div>
+<div id="ESPNOW">
+Synchro via ESP-NOW : <input type="checkbox" name="EN"><br><i>(en mode point d'accès ou sans WiFi)</i><br>
+</div>
+</div>
+<div class="sec">
+<h3>Groupes de synchronisation</h3>
+<input name="GS" id="GS" type="number" style="display: none;"><!-- hidden inputs for bitwise group checkboxes -->
+<input name="GR" id="GR" type="number" style="display: none;">
+<table style="margin: 0 auto;">
+	<tr>
+		<td></td>
+		<td>1</td>
+		<td>2</td>
+		<td>3</td>
+		<td>4</td>
+		<td>5</td>
+		<td>6</td>
+		<td>7</td>
+		<td>8</td>
+	</tr>
+	<tr>
+		<td>Envoi :</td>
+		<td><input type="checkbox" id="G1" name="G1"></td>
+		<td><input type="checkbox" id="G2" name="G2"></td>
+		<td><input type="checkbox" id="G3" name="G3"></td>
+		<td><input type="checkbox" id="G4" name="G4"></td>
+		<td><input type="checkbox" id="G5" name="G5"></td>
+		<td><input type="checkbox" id="G6" name="G6"></td>
+		<td><input type="checkbox" id="G7" name="G7"></td>
+		<td><input type="checkbox" id="G8" name="G8"></td>
+	</tr>
+	<tr>
+		<td>Réception :</td>
+		<td><input type="checkbox" id="R1" name="R1"></td>
+		<td><input type="checkbox" id="R2" name="R2"></td>
+		<td><input type="checkbox" id="R3" name="R3"></td>
+		<td><input type="checkbox" id="R4" name="R4"></td>
+		<td><input type="checkbox" id="R5" name="R5"></td>
+		<td><input type="checkbox" id="R6" name="R6"></td>
+		<td><input type="checkbox" id="R7" name="R7"></td>
+		<td><input type="checkbox" id="R8" name="R8"></td>
+	</tr>
+</table>
+</div>
+<div class="sec">
+<h3>Réception</h3>
+<nowrap><input type="checkbox" name="RB">Luminosité,</nowrap> <nowrap><input type="checkbox" name="RC">Couleur,</nowrap> <nowrap><input type="checkbox" name="RX">Effets</nowrap> <nowrap>et <input type="checkbox" name="RP">Palette</nowrap><br>
+<input type="checkbox" name="SO"> Options des segments, <input type="checkbox" name="SG"> limites
+</div>
+<div class="sec">
+<h3>Envoi</h3>
+Activer la synchro au démarrage : <input type="checkbox" name="SS"><br>
+Notifier lors d'un changement direct : <input type="checkbox" name="SD"><br>
+Notifier lors d'un appui bouton ou IR : <input type="checkbox" name="SB"><br>
+Notifier les commandes Alexa : <input type="checkbox" name="SA"><br>
+Notifier les changements Philips Hue : <input type="checkbox" name="SH"><br>
+Retransmissions des paquets UDP : <input name="UR" type="number" min="0" max="30" class="d5" required><br>
+<i class="warn">Redémarrage nécessaire pour appliquer les changements. </i>
+</div>
+<div class="sec">
+<h3>Liste des appareils</h3>
+Activer la liste des appareils : <input type="checkbox" name="NL"><br>
+Rendre cet appareil détectable : <input type="checkbox" name="NB">
+</div>
+<div class="sec">
+<h3>Temps réel</h3>
+Recevoir l'UDP temps réel : <input type="checkbox" name="RD"><br>
+Segment principal uniquement : <input type="checkbox" name="MO"><br>
+Respecter les LED maps : <input type="checkbox" name="RLM"><br><br>
+<h4>Entrée DMX réseau</h4><br>
+Type :
+<select name=DI onchange="SP(); adj();">
+<option value=5568>E1.31 (sACN)</option>
+<option value=6454>Art-Net</option>
+<option value=0 selected>Port personnalisé</option>
+</select><br>
+<div id=xp>Port : <input name="EP" type="number" min="1" max="65535" value="5568" class="d5" required><br></div>
+Multicast : <input type="checkbox" name="EM"><br>
+Univers de départ : <input name="EU" type="number" min="0" max="63999" required><br>
+<i>Redémarrage nécessaire.</i> Découvrez <a href="https://github.com/LedFx/LedFx" target="_blank">LedFx</a>!<br>
+Ignorer les paquets hors séquence : <input type="checkbox" name="ES"><br>
+Adresse DMX de départ : <input name="DA" type="number" min="1" max="510" required><br>
+Espacement DMX des segments : <input name="XX" type="number" min="0" max="150" required><br>
+Priorité du port E1.31 : <input name="PY" type="number" min="0" max="200" required><br>
+Mode DMX :
+<select name=DM>
+<option value=0>Désactivé</option>
+<option value=1>RVB unique</option>
+<option value=2>DRVB unique</option>
+<option value=3>Effet</option>
+<option value=7>Effet + blanc</option>
+<option value=8>Effet par segment</option>
+<option value=9>Effet par segment + blanc</option>
+<option value=4>Multi RVB</option>
+<option value=5>Variateur + multi RVB</option>
+<option value=6>Multi RVBW</option>
+<option value=10>Préréglage</option>
+</select><br>
+<a href="https://kno.wled.ge/interfaces/e1.31-dmx/" target="_blank">Infos E1.31</a><br>
+Délai d'expiration : <input name="ET" type="number" min="1" max="65000" required> ms<br>
+Forcer la luminosité maximale : <input type="checkbox" name="FB"><br>
+Désactiver la correction gamma en temps réel : <input type="checkbox" name="RG"><br>
+Décalage des LED en temps réel : <input name="WO" type="number" min="-255" max="255" required>
+<div id="dmxInput">
+	<br>
+	<h4>Entrée DMX filaire</h4>
+	Broche RX DMX : <input name="IDMR" type="number" min="-1" max="99">RO<br/>
+	Broche TX DMX : <input name="IDMT" type="number" min="-1" max="99">DI<br/>
+	Broche d'activation DMX : <input name="IDME" type="number" min="-1" max="99">RE+DE<br/>
+	Port DMX : <input name="IDMP" type="number" min="1" max="2"><br/>
+	<i class="warn">Redémarrage nécessaire pour appliquer les changements.</i>
+</div>
+<div id="dmxInputOff">
+	<br><i class="warn">Cette version du firmware n'inclut pas l'entrée DMX. <br></i>
+</div> 
+<div id="dmxOnOffOutput">
+  <br><i class="warn">Cette version du firmware n'inclut pas la sortie DMX. <br></i>
+</div> 
+</div>
+<div class="sec">
+<h3>Assistant vocal Alexa</h3>
+<div id="NoAlexa" class="hide">
+	<i class="warn">Cette version du firmware n'inclut pas Alexa.<br></i><br>
+</div>
+<div id="Alexa">
+Émuler un appareil Alexa : <input type="checkbox" name="AL"><br>
+Nom d'appel Alexa : <input type="text" name="AI" maxlength="32"><br>
+Émuler aussi des appareils pour appeler les <input name="AP" type="number" class="s" min="0" max="9"> premiers préréglages<br><br>
+</div>
+</div>
+
+<div class="warn">&#9888; <b>MQTT et la synchro Hue se connectent à des hôtes externes !<br>
+Cela peut affecter la réactivité de WLED.</b><br>
+</div>
+Pour de meilleurs résultats, n'utilisez qu'un seul de ces services à la fois.<br>
+(ou connectez-les à un second ESP et utilisez la synchro UDP)
+
+<div class="sec">
+<h3>MQTT</h3>
+<div id="NoMQTT" class="hide">
+	<i class="warn">Cette version du firmware n'inclut pas MQTT.<br></i>
+</div>
+<div id="MQTT">
+Activer MQTT : <input type="checkbox" name="MQ"><br>
+Broker : <input type="text" name="MS" maxlength="32">
+Port : <input name="MQPORT" type="number" min="1" max="65535" class="d5"><br>
+<b>Les identifiants MQTT sont envoyés via une connexion non sécurisée.<br>
+N'utilisez jamais le mot de passe MQTT pour un autre service !</b><br>
+Nom d'utilisateur : <input type="text" name="MQUSER" maxlength="40"><br>
+Mot de passe : <input type="password" name="MQPASS" maxlength="64"><br>
+ID client : <input type="text" name="MQCID" maxlength="40"><br>
+Topic de l'appareil : <input type="text" name="MD" maxlength="32"><br>
+Topic du groupe : <input type="text" name="MG" maxlength="32"><br>
+Publier lors d'un appui bouton : <input type="checkbox" name="BM"><br>
+Conserver (retain) les messages de luminosité et de couleur : <input type="checkbox" name="RT"><br>
+<i class="warn">Redémarrage nécessaire pour appliquer les changements. </i><a href="https://kno.wled.ge/interfaces/mqtt/" target="_blank">Infos MQTT</a>
+</div>
+</div>
+<div class="sec">
+<h3>Philips Hue</h3>
+<div id="NoHue" class="hide">
+	<em class="warn">Cette version du firmware n'inclut pas Philips Hue.<br></em>
+</div>
+<div id="Hue">
+<i>L'IP du pont et le numéro de la lampe se trouvent dans la section « À propos » de l'application Hue.</i><br>
+Interroger la lampe Hue <input name="HL" type="number" min="1" max="99" > toutes les <input name="HI" type="number" min="100" max="65000"> ms : <input type="checkbox" name="HP"><br>
+Puis recevoir <input type="checkbox" name="HO"> marche/arrêt, <input type="checkbox" name="HB"> luminosité et <input type="checkbox" name="HC"> couleur<br>
+IP du pont Hue :<br>
+<input name="H0" type="number" class="s" min="0" max="255" > .
+<input name="H1" type="number" class="s" min="0" max="255" > .
+<input name="H2" type="number" class="s" min="0" max="255" > .
+<input name="H3" type="number" class="s" min="0" max="255" ><br>
+<b>Appuyez sur le bouton du pont, puis enregistrez cette page !</b><br>
+(lors de la première connexion)<br>
+État Hue : <span class="sip"> Désactivé dans cette version </span>
+</div>
+</div>
+<div class="sec">
+<h3>Port série</h3>
+<div id="NoSerial" class="hide">
+	<em class="warn">Cette version du firmware ne prend pas en charge le port série.<br></em>
+</div>
+<div id="Serial">
+Débit (bauds) :
+<select name=BD>
+<option value=1152>115200</option>
+<option value=2304>230400</option>
+<option value=4608>460800</option>
+<option value=5000>500000</option>
+<option value=5760>576000</option>
+<option value=9216>921600</option>
+<option value=10000>1000000</option>
+<option value=15000>1500000</option>
+</select><br>
+<i>Laissez 115200 pour utiliser Improv. Certaines cartes ne gèrent pas les débits élevés.</i>
+</div>
+</div>
+<hr>
+<button type="button" onclick="B()">Retour</button><button type="submit">Enregistrer</button>
+</form>
+</body>
+</html>
